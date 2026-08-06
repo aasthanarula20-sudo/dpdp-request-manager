@@ -48,7 +48,10 @@ export default function RequestDetail({
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Action failed");
-      setMessage(`Done: ${body.status}${body.reason ? ` — ${body.reason}` : ""}`);
+      const emailNote = body.email?.sent
+        ? "Email sent to requester."
+        : `Email NOT sent${body.email?.error ? ` (${body.email.error})` : ""}.`;
+      setMessage(`Done: ${body.status}${body.reason ? ` — ${body.reason}` : ""}. ${emailNote}`);
       router.refresh();
     } catch (err) {
       setMessage(`Error: ${(err as Error).message}`);

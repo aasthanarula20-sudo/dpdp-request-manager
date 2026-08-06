@@ -3,7 +3,16 @@ import { getServiceClient } from "@/lib/supabase/server";
 import { resolveAction, applyAction } from "@/lib/rules-engine";
 import { runAnonymizationQa } from "@/lib/ai/anonymization-qa";
 import { draftResponse } from "@/lib/ai/response-drafter";
+import { sendEmail } from "@/lib/email";
 import type { RequestType } from "@/lib/types";
+
+function toHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<p style="white-space:pre-wrap;font-family:inherit;">${escaped}</p>`;
+}
 
 interface ActionBody {
   decision: "approve" | "reject";
@@ -40,7 +49,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   const { data: request, error: fetchError } = await supabase
     .from("data_requests")
-    .select("id, request_type, matched_contact_id, requester_name, status, requested_field_changes")
+    .select("id, request_type, matched_contact_id, requester_name, requester_email, status, requested_field_changes")
     .eq("id", id)
     .single();
 
@@ -73,7 +82,18 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     });
     await supabase.from("data_requests").update({ draft_response: drafted.draft }).eq("id", id);
 
-    return NextResponse.json({ status: "rejected", action: "reject_with_reason", draftResponse: drafted });
+    const emailResult = await sendEmail(
+      request.requester_email,
+      `Update on your ${requestType.replace("_", " ")} request`,
+      toHtml(drafted.draft)
+    );
+
+    return NextResponse.json({
+      status: "rejected",
+      action: "reject_with_reason",
+      draftResponse: drafted,
+      email: emailResult,
+    });
   }
 
   // decision === "approve"
@@ -156,10 +176,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   });
   await supabase.from("data_requests").update({ draft_response: drafted.draft }).eq("id", id);
 
+  const emailResult = await sendEmail(
+    request.requester_email,
+    `Update on your ${requestType.replace("_", " ")} request`,
+    toHtml(drafted.draft)
+  );
+
   return NextResponse.json({
     status: finalStatus,
     action: resolved.action,
     reason: resolved.reason,
     draftResponse: drafted,
+    email: emailResult,
   });
 }
