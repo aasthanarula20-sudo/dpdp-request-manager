@@ -19,14 +19,21 @@ function generateOtp(): string {
 
 /**
  * SMS delivery isn't wired up (no provider chosen) — OTPs go by email only.
- * Falls back to a console log if RESEND_API_KEY isn't set, so local dev
- * still works without the env var.
+ * In production, a missing RESEND_API_KEY is a hard failure — silently
+ * falling back to console-log-only would look like a successful send
+ * while no email ever went out. Local/dev environments still fall back,
+ * since that's the documented no-provider testing path.
  */
 async function sendOtp(target: OtpTarget, code: string): Promise<void> {
   console.log(`[OTP] code ${code} for contact on file: ${target.email}${target.phone ? ` / ${target.phone}` : ""}`);
 
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return;
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("RESEND_API_KEY is not set — cannot send verification email in production");
+    }
+    return;
+  }
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
