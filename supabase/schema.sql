@@ -71,7 +71,11 @@ create table data_requests (
   category text,
   severity severity_level,
   draft_response text,
-  requested_field_changes jsonb
+  requested_field_changes jsonb,
+  identity_verified_at timestamptz,
+  otp_hash text,
+  otp_expires_at timestamptz,
+  otp_attempts integer not null default 0
 );
 create index idx_data_requests_status on data_requests (status);
 create index idx_data_requests_matched_contact on data_requests (matched_contact_id);
@@ -80,7 +84,7 @@ create index idx_data_requests_email on data_requests (requester_email);
 create function set_sla_deadline()
 returns trigger as $$
 begin
-  new.sla_deadline := new.submitted_at + interval '30 days';
+  new.sla_deadline := new.submitted_at + interval '90 days';
   return new;
 end;
 $$ language plpgsql;
@@ -128,7 +132,7 @@ create table rules (
 );
 insert into rules (request_type, trigger_condition, action, requires_approval, notes) values
   ('access', 'matched_contact_id exists', 'compile_export', false, 'Read-only, low risk'),
-  ('correction', 'matched_contact_id exists AND requested_field_changes set', 'update_fields', true, 'Never auto-write'),
+  ('correction', 'matched_contact_id exists AND requested_field_changes set', 'update_fields', true, 'Collected as structured JSON post-OTP; admin approval still required'),
   ('erasure', 'matched_contact_id exists; branches on legal_basis', 'hard_delete', true, 'If legal_basis = legal_obligation or contract, use reject_with_reason instead — enforced in code'),
   ('consent_withdrawal', 'matched_contact_id exists', 'update_consent_flag', false, 'Low risk, reversible'),
   ('grievance', 'any — matched_contact_id optional', 'create_escalation_ticket', true, 'Human-only workflow'),

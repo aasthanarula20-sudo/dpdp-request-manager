@@ -61,4 +61,5 @@ export interface DataRequestRow {
   severity: SeverityLevel | null;
   draft_response: string | null;
   requested_field_changes: Record<string, unknown> | null;
+  identity_verified_at: string | null;
 }

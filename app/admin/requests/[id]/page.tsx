@@ -10,7 +10,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   const { data: request, error } = await supabase
     .from("data_requests")
-    .select("*")
+    .select(
+      "id, request_type, requester_name, requester_email, requester_phone, details, matched_contact_id, status, submitted_via, submitted_at, sla_deadline, resolved_at, detected_pii, category, severity, draft_response, requested_field_changes, identity_verified_at"
+    )
     .eq("id", id)
     .single();
 

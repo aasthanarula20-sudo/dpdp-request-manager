@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
-import { REQUEST_TYPES, type RequestType } from "@/lib/types";
+import { REQUEST_TYPES, type RequestStatus, type RequestType } from "@/lib/types";
 
-type Step = "type" | "details" | "review" | "done";
+type Step = "type" | "details" | "review" | "otp" | "correctionFields" | "done";
 
 interface FormState {
   requestType: RequestType | null;
@@ -13,9 +13,15 @@ interface FormState {
   email: string;
   phone: string;
   details: string;
-  correctionChanges: string;
   nomineeName: string;
   nomineeContact: string;
+}
+
+interface CurrentFields {
+  full_name: string;
+  email: string;
+  phone: string | null;
+  city: string | null;
 }
 
 const initialState: FormState = {
@@ -24,9 +30,15 @@ const initialState: FormState = {
   email: "",
   phone: "",
   details: "",
-  correctionChanges: "",
   nomineeName: "",
   nomineeContact: "",
+};
+
+const CORRECTABLE_FIELD_LABELS: Record<keyof CurrentFields, string> = {
+  full_name: "Full name",
+  email: "Email",
+  phone: "Phone",
+  city: "City",
 };
 
 export default function RequestPage() {
@@ -34,11 +46,13 @@ export default function RequestPage() {
   const [form, setForm] = useState<FormState>(initialState);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    requestId: string;
-    slaDeadline: string;
-    matchedContactId: string | null;
-  } | null>(null);
+
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [slaDeadline, setSlaDeadline] = useState<string | null>(null);
+  const [matched, setMatched] = useState(false);
+  const [finalStatus, setFinalStatus] = useState<RequestStatus | null>(null);
+  const [noMatchReason, setNoMatchReason] = useState<string | null>(null);
+  const [currentFields, setCurrentFields] = useState<CurrentFields | null>(null);
 
   const selectedType = REQUEST_TYPES.find((t) => t.value === form.requestType);
 
@@ -54,9 +68,6 @@ export default function RequestPage() {
     let requestedFieldChanges: Record<string, unknown> | undefined;
     let details = form.details || undefined;
 
-    if (form.requestType === "correction") {
-      requestedFieldChanges = { description: form.correctionChanges };
-    }
     if (form.requestType === "nomination") {
       requestedFieldChanges = {
         nomineeName: form.nomineeName,
@@ -82,22 +93,34 @@ export default function RequestPage() {
         }),
       });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Something went wrong submitting your request.");
-      }
-
       const data = await res.json();
-      setResult({
-        requestId: data.requestId,
-        slaDeadline: data.slaDeadline,
-        matchedContactId: data.matchedContactId,
-      });
-      setStep("done");
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong submitting your request.");
+
+      setRequestId(data.requestId);
+      setSlaDeadline(data.slaDeadline);
+      setMatched(data.matchedContactId !== null);
+      setNoMatchReason(data.reason ?? null);
+
+      if (data.otpRequired) {
+        setStep("otp");
+      } else {
+        setFinalStatus(data.status);
+        setStep("done");
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function handleOtpVerified(fields: CurrentFields | null) {
+    if (form.requestType === "correction" && fields) {
+      setCurrentFields(fields);
+      setStep("correctionFields");
+    } else {
+      setFinalStatus("verifying");
+      setStep("done");
     }
   }
 
@@ -108,9 +131,9 @@ export default function RequestPage() {
           <div className="mb-8 flex items-center gap-2 text-sm text-slate-500">
             <StepDot active={step === "type"} done={step !== "type"} label="1" />
             <div className="h-px w-8 bg-slate-300" />
-            <StepDot active={step === "details"} done={step === "review"} label="2" />
+            <StepDot active={step === "details"} done={step === "review" || step === "otp" || step === "correctionFields"} label="2" />
             <div className="h-px w-8 bg-slate-300" />
-            <StepDot active={step === "review"} done={false} label="3" />
+            <StepDot active={step === "review"} done={step === "otp" || step === "correctionFields"} label="3" />
           </div>
         )}
 
@@ -143,11 +166,28 @@ export default function RequestPage() {
             />
           )}
 
-          {step === "done" && result && form.requestType && (
+          {step === "otp" && requestId && (
+            <OtpStep requestId={requestId} onVerified={handleOtpVerified} />
+          )}
+
+          {step === "correctionFields" && requestId && currentFields && (
+            <CorrectionFieldsStep
+              requestId={requestId}
+              currentFields={currentFields}
+              onDone={() => {
+                setFinalStatus("verifying");
+                setStep("done");
+              }}
+            />
+          )}
+
+          {step === "done" && requestId && slaDeadline && finalStatus && form.requestType && (
             <DoneStep
-              requestId={result.requestId}
-              slaDeadline={result.slaDeadline}
-              matched={result.matchedContactId !== null}
+              requestId={requestId}
+              slaDeadline={slaDeadline}
+              status={finalStatus}
+              matched={matched}
+              reason={noMatchReason}
               requestType={form.requestType}
             />
           )}
@@ -228,7 +268,6 @@ function DetailsStep({
 }) {
   const canContinue =
     form.email.trim().length > 0 &&
-    (form.requestType !== "correction" || form.correctionChanges.trim().length > 0) &&
     (form.requestType !== "nomination" ||
       (form.nomineeName.trim().length > 0 && form.nomineeContact.trim().length > 0));
 
@@ -271,14 +310,10 @@ function DetailsStep({
         </Field>
 
         {form.requestType === "correction" && (
-          <Field label="What would you like corrected?" required>
-            <textarea
-              value={form.correctionChanges}
-              onChange={(e) => update("correctionChanges", e.target.value)}
-              className="input min-h-24"
-              placeholder="Describe the fields and the correct values, e.g. 'My city should be Pune, not Mumbai.'"
-            />
-          </Field>
+          <p className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-md p-3">
+            After we verify your identity, you&apos;ll see your current on-file details and can
+            pick exactly which fields to correct.
+          </p>
         )}
 
         {form.requestType === "nomination" && (
@@ -376,9 +411,6 @@ function ReviewStep({
         <ReviewRow label="Name" value={form.name || "—"} />
         <ReviewRow label="Email" value={form.email} />
         <ReviewRow label="Phone" value={form.phone || "—"} />
-        {form.requestType === "correction" && (
-          <ReviewRow label="Requested change" value={form.correctionChanges} />
-        )}
         {form.requestType === "nomination" && (
           <ReviewRow label="Nominee" value={`${form.nomineeName} (${form.nomineeContact})`} />
         )}
@@ -408,11 +440,196 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function OtpStep({
+  requestId,
+  onVerified,
+}: {
+  requestId: string;
+  onVerified: (fields: CurrentFields | null) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleVerify() {
+    setVerifying(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/requests/${requestId}/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error === "incorrect") {
+          setError(`Incorrect code. ${data.attemptsRemaining} attempt(s) remaining.`);
+        } else if (data.error === "expired") {
+          setError("This code has expired. Please submit a new request to get a fresh one.");
+        } else if (data.error === "locked") {
+          setError("Too many incorrect attempts. Please submit a new request.");
+        } else {
+          setError(data.error ?? "Verification failed.");
+        }
+        return;
+      }
+
+      onVerified(data.currentFields ?? null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-slate-900 mb-2">Verify it&apos;s you</h2>
+      <p className="text-sm text-slate-500 mb-6">
+        We sent a 6-digit code to the contact information already on file for this record.
+        Enter it below to continue. The code expires in 10 minutes.
+      </p>
+
+      <Field label="Verification code" required>
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+          className="input tracking-[0.3em] text-center font-mono text-lg"
+          placeholder="000000"
+        />
+      </Field>
+
+      {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+
+      <button
+        type="button"
+        disabled={verifying || code.length !== 6}
+        onClick={handleVerify}
+        className="mt-6 w-full rounded-md bg-slate-900 text-white py-2.5 font-medium disabled:opacity-40 hover:bg-slate-800 transition-colors"
+      >
+        {verifying ? "Verifying…" : "Verify"}
+      </button>
+    </div>
+  );
+}
+
+function CorrectionFieldsStep({
+  requestId,
+  currentFields,
+  onDone,
+}: {
+  requestId: string;
+  currentFields: CurrentFields;
+  onDone: () => void;
+}) {
+  const [checked, setChecked] = useState<Record<keyof CurrentFields, boolean>>({
+    full_name: false,
+    email: false,
+    phone: false,
+    city: false,
+  });
+  const [values, setValues] = useState<Record<keyof CurrentFields, string>>({
+    full_name: "",
+    email: "",
+    phone: "",
+    city: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const anyChecked = Object.values(checked).some(Boolean);
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError(null);
+
+    const changes: Record<string, string> = {};
+    (Object.keys(checked) as (keyof CurrentFields)[]).forEach((key) => {
+      if (checked[key] && values[key].trim().length > 0) {
+        changes[key] = values[key].trim();
+      }
+    });
+
+    if (Object.keys(changes).length === 0) {
+      setError("Enter a new value for at least one field you've selected.");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/requests/${requestId}/correction-fields`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to submit correction.");
+      onDone();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-slate-900 mb-2">What needs correcting?</h2>
+      <p className="text-sm text-slate-500 mb-6">
+        Here&apos;s what we currently have on file. Select the field(s) that are wrong and enter
+        the correct value.
+      </p>
+
+      <div className="grid gap-4">
+        {(Object.keys(CORRECTABLE_FIELD_LABELS) as (keyof CurrentFields)[]).map((key) => (
+          <div key={key} className="border border-slate-200 rounded-md p-3">
+            <label className="flex items-center gap-2 mb-2">
+              <input
+                type="checkbox"
+                checked={checked[key]}
+                onChange={(e) => setChecked((c) => ({ ...c, [key]: e.target.checked }))}
+              />
+              <span className="font-medium text-slate-900">{CORRECTABLE_FIELD_LABELS[key]}</span>
+              <span className="text-sm text-slate-500 ml-auto">
+                Current: {currentFields[key] || "—"}
+              </span>
+            </label>
+            {checked[key] && (
+              <input
+                type="text"
+                value={values[key]}
+                onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                className="input"
+                placeholder={`Correct ${CORRECTABLE_FIELD_LABELS[key].toLowerCase()}`}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
+
+      <button
+        type="button"
+        disabled={submitting || !anyChecked}
+        onClick={handleSubmit}
+        className="mt-6 w-full rounded-md bg-slate-900 text-white py-2.5 font-medium disabled:opacity-40 hover:bg-slate-800 transition-colors"
+      >
+        {submitting ? "Submitting…" : "Submit correction"}
+      </button>
+    </div>
+  );
+}
+
 const NEXT_STEPS: Record<RequestType, string> = {
   access:
     "Your request goes to our team to compile the personal data we hold about you. This is a read-only, low-risk request.",
   correction:
-    "Our team will review the change you described and manually verify it against your record before applying it — corrections are never auto-applied from free text.",
+    "Our team will verify the change you selected against your record and apply it manually.",
   erasure:
     "We'll check whether your data is subject to a legal or contractual retention requirement. If not, it will be permanently deleted once approved.",
   consent_withdrawal:
@@ -426,12 +643,16 @@ const NEXT_STEPS: Record<RequestType, string> = {
 function DoneStep({
   requestId,
   slaDeadline,
+  status,
   matched,
+  reason,
   requestType,
 }: {
   requestId: string;
   slaDeadline: string;
+  status: RequestStatus;
   matched: boolean;
+  reason: string | null;
   requestType: RequestType;
 }) {
   const deadline = new Date(slaDeadline).toLocaleDateString("en-IN", {
@@ -441,16 +662,21 @@ function DoneStep({
   });
   const typeLabel = REQUEST_TYPES.find((t) => t.value === requestType)?.label ?? requestType;
 
+  const heading =
+    status === "resolved" ? "Request resolved" : status === "rejected" ? "Request closed" : "Request submitted";
+
+  const intro =
+    status === "verifying"
+      ? `We've received your ${typeLabel.toLowerCase()} request and will respond within the statutory timeline.`
+      : reason ?? "Your request has been processed.";
+
   return (
     <div className="text-center py-4">
       <div className="flex justify-center mb-4">
         <CheckCircle2 className="w-10 h-10 text-emerald-600" />
       </div>
-      <h2 className="text-xl font-semibold text-slate-900 mb-2">Request submitted</h2>
-      <p className="text-slate-600 mb-6">
-        We&apos;ve received your {typeLabel.toLowerCase()} request and will respond within the
-        statutory timeline.
-      </p>
+      <h2 className="text-xl font-semibold text-slate-900 mb-2">{heading}</h2>
+      <p className="text-slate-600 mb-6">{intro}</p>
 
       <div className="bg-slate-50 rounded-md border border-slate-200 p-4 text-left text-sm mb-4">
         <div className="flex justify-between mb-1">
@@ -463,12 +689,14 @@ function DoneStep({
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-100 rounded-md p-4 text-left text-sm mb-4">
-        <div className="font-medium text-blue-900 mb-1">What happens next</div>
-        <p className="text-blue-800">{NEXT_STEPS[requestType]}</p>
-      </div>
+      {status === "verifying" && (
+        <div className="bg-blue-50 border border-blue-100 rounded-md p-4 text-left text-sm mb-4">
+          <div className="font-medium text-blue-900 mb-1">What happens next</div>
+          <p className="text-blue-800">{NEXT_STEPS[requestType]}</p>
+        </div>
+      )}
 
-      {!matched && (
+      {status === "verifying" && !matched && (
         <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-left text-sm mb-6">
           <div className="font-medium text-amber-900 mb-1">Couldn&apos;t find your record</div>
           <p className="text-amber-800">

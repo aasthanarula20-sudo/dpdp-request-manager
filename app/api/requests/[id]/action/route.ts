@@ -87,14 +87,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     );
   }
 
-  // update_fields must always be admin-supplied at approval time (the
-  // rules table marks correction "Never auto-write" — the requester's free
-  // text isn't structured field:value data). store_nomination, however, was
-  // captured as structured data at intake, so it's safe to source from
-  // requested_field_changes if the admin doesn't override it.
+  // Corrections are now collected as structured field:value JSON via the
+  // post-OTP field-picker (not free text), so — like store_nomination — it's
+  // safe to source from requested_field_changes if the admin doesn't override it.
   const effectiveFieldsAffected =
     fieldsAffected ??
-    (resolved.action === "store_nomination"
+    (resolved.action === "store_nomination" || resolved.action === "update_fields"
       ? (request.requested_field_changes as Record<string, unknown> | null) ?? undefined
       : undefined);
 
