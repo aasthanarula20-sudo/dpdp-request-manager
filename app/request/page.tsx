@@ -34,7 +34,11 @@ export default function RequestPage() {
   const [form, setForm] = useState<FormState>(initialState);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ requestId: string; slaDeadline: string } | null>(null);
+  const [result, setResult] = useState<{
+    requestId: string;
+    slaDeadline: string;
+    matchedContactId: string | null;
+  } | null>(null);
 
   const selectedType = REQUEST_TYPES.find((t) => t.value === form.requestType);
 
@@ -84,7 +88,11 @@ export default function RequestPage() {
       }
 
       const data = await res.json();
-      setResult({ requestId: data.requestId, slaDeadline: data.slaDeadline });
+      setResult({
+        requestId: data.requestId,
+        slaDeadline: data.slaDeadline,
+        matchedContactId: data.matchedContactId,
+      });
       setStep("done");
     } catch (err) {
       setError((err as Error).message);
@@ -135,8 +143,13 @@ export default function RequestPage() {
             />
           )}
 
-          {step === "done" && result && (
-            <DoneStep requestId={result.requestId} slaDeadline={result.slaDeadline} />
+          {step === "done" && result && form.requestType && (
+            <DoneStep
+              requestId={result.requestId}
+              slaDeadline={result.slaDeadline}
+              matched={result.matchedContactId !== null}
+              requestType={form.requestType}
+            />
           )}
         </div>
       </div>
@@ -395,12 +408,38 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DoneStep({ requestId, slaDeadline }: { requestId: string; slaDeadline: string }) {
+const NEXT_STEPS: Record<RequestType, string> = {
+  access:
+    "Your request goes to our team to compile the personal data we hold about you. This is a read-only, low-risk request.",
+  correction:
+    "Our team will review the change you described and manually verify it against your record before applying it — corrections are never auto-applied from free text.",
+  erasure:
+    "We'll check whether your data is subject to a legal or contractual retention requirement. If not, it will be permanently deleted once approved.",
+  consent_withdrawal:
+    "We'll turn off marketing communications tied to your record. This is low-risk and reversible if you opt back in later.",
+  grievance:
+    "This goes straight to a human reviewer — grievances are never auto-resolved, and we may reach out for more information.",
+  nomination:
+    "Your nominee's details will be recorded against your account for future reference.",
+};
+
+function DoneStep({
+  requestId,
+  slaDeadline,
+  matched,
+  requestType,
+}: {
+  requestId: string;
+  slaDeadline: string;
+  matched: boolean;
+  requestType: RequestType;
+}) {
   const deadline = new Date(slaDeadline).toLocaleDateString("en-IN", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
+  const typeLabel = REQUEST_TYPES.find((t) => t.value === requestType)?.label ?? requestType;
 
   return (
     <div className="text-center py-4">
@@ -409,9 +448,11 @@ function DoneStep({ requestId, slaDeadline }: { requestId: string; slaDeadline: 
       </div>
       <h2 className="text-xl font-semibold text-slate-900 mb-2">Request submitted</h2>
       <p className="text-slate-600 mb-6">
-        We&apos;ve received your request and will respond within the statutory timeline.
+        We&apos;ve received your {typeLabel.toLowerCase()} request and will respond within the
+        statutory timeline.
       </p>
-      <div className="bg-slate-50 rounded-md border border-slate-200 p-4 text-left text-sm mb-6">
+
+      <div className="bg-slate-50 rounded-md border border-slate-200 p-4 text-left text-sm mb-4">
         <div className="flex justify-between mb-1">
           <span className="text-slate-500">Reference ID</span>
           <span className="font-mono text-slate-900">{requestId}</span>
@@ -421,6 +462,23 @@ function DoneStep({ requestId, slaDeadline }: { requestId: string; slaDeadline: 
           <span className="text-slate-900">{deadline}</span>
         </div>
       </div>
+
+      <div className="bg-blue-50 border border-blue-100 rounded-md p-4 text-left text-sm mb-4">
+        <div className="font-medium text-blue-900 mb-1">What happens next</div>
+        <p className="text-blue-800">{NEXT_STEPS[requestType]}</p>
+      </div>
+
+      {!matched && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-left text-sm mb-6">
+          <div className="font-medium text-amber-900 mb-1">Couldn&apos;t find your record</div>
+          <p className="text-amber-800">
+            We didn&apos;t find an existing record matching the email or phone number you
+            provided. Our team will review this manually — quote your reference ID above if you
+            contact support.
+          </p>
+        </div>
+      )}
+
       <Link href="/" className="text-sm text-slate-500 hover:text-slate-700">
         Return to home
       </Link>

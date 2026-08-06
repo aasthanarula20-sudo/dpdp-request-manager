@@ -78,7 +78,24 @@ export async function resolveAction(
     };
   }
 
-  return { action: rule.action as ActionType };
+  const action = rule.action as ActionType;
+  const actionsRequiringContact: ActionType[] = [
+    "update_fields",
+    "update_consent_flag",
+    "store_nomination",
+  ];
+
+  if (actionsRequiringContact.includes(action) && !matchedContactId) {
+    return {
+      action: "reject_with_reason",
+      reason: `No matching contact record found for this ${requestType.replace(
+        "_",
+        " "
+      )} request.`,
+    };
+  }
+
+  return { action };
 }
 
 export interface ApplyActionParams {
