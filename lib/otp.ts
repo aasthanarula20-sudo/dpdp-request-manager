@@ -18,11 +18,34 @@ function generateOtp(): string {
 }
 
 /**
- * TODO: no real provider wired up yet (Resend for email, Twilio for SMS).
- * Logs the code so the flow is testable end-to-end before that decision is made.
+ * SMS delivery isn't wired up (no provider chosen) — OTPs go by email only.
+ * Falls back to a console log if RESEND_API_KEY isn't set, so local dev
+ * still works without the env var.
  */
 async function sendOtp(target: OtpTarget, code: string): Promise<void> {
   console.log(`[OTP] code ${code} for contact on file: ${target.email}${target.phone ? ` / ${target.phone}` : ""}`);
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "DPDP Request Manager <onboarding@resend.dev>",
+      to: [target.email],
+      subject: "Your verification code",
+      html: `<p>Your verification code is:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px;">${code}</p><p>This code expires in ${OTP_EXPIRY_MINUTES} minutes. If you didn't request this, you can ignore this email.</p>`,
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Resend email send failed (${res.status}): ${detail}`);
+  }
 }
 
 /**
