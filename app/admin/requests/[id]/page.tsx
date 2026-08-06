@@ -11,7 +11,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const { data: request, error } = await supabase
     .from("data_requests")
     .select(
-      "id, request_type, requester_name, requester_email, requester_phone, details, matched_contact_id, status, submitted_via, submitted_at, sla_deadline, resolved_at, detected_pii, category, severity, draft_response, requested_field_changes, identity_verified_at"
+      "id, request_type, requester_name, requester_email, requester_phone, details, matched_contact_id, status, submitted_via, submitted_at, sla_deadline, resolved_at, detected_pii, category, severity, draft_response, requested_field_changes, identity_verified_at, suggested_contact_id, suggested_match_reason"
     )
     .eq("id", id)
     .single();
@@ -30,5 +30,15 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     contact = data;
   }
 
-  return <RequestDetail request={request} contact={contact} />;
+  let suggestedContact = null;
+  if (request.suggested_contact_id) {
+    const { data } = await supabase
+      .from("crm_contacts")
+      .select("id, full_name, email, phone")
+      .eq("id", request.suggested_contact_id)
+      .maybeSingle();
+    suggestedContact = data;
+  }
+
+  return <RequestDetail request={request} contact={contact} suggestedContact={suggestedContact} />;
 }

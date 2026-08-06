@@ -4,6 +4,7 @@ import { matchContact } from "@/lib/identity-matching";
 import { classifyPii } from "@/lib/ai/pii-classifier";
 import { triageGrievance } from "@/lib/ai/grievance-triage";
 import { issueOtp } from "@/lib/otp";
+import { suggestContactMatch } from "@/lib/ai/contact-match-suggester";
 import { REQUEST_TYPE_CONFIG } from "@/lib/request-type-config";
 import type { RequestStatus, RequestType, SubmissionChannel } from "@/lib/types";
 
@@ -62,6 +63,12 @@ export async function POST(req: NextRequest) {
   const matched = matchedContactId !== null;
   const config = REQUEST_TYPE_CONFIG[requestType];
 
+  // Advisory only — never affects matchedContactId or the outcome below.
+  // An admin has to explicitly confirm it via /confirm-match.
+  const matchSuggestion = matched
+    ? { contactId: null, reason: null }
+    : await suggestContactMatch(email, phone, name);
+
   let initialStatus: RequestStatus = "received";
   let resolvedAt: string | null = null;
   let noMatchReason: string | null = null;
@@ -98,6 +105,8 @@ export async function POST(req: NextRequest) {
       submitted_via: submittedVia,
       requested_field_changes: requestedFieldChanges ?? null,
       resolved_at: resolvedAt,
+      suggested_contact_id: matchSuggestion.contactId,
+      suggested_match_reason: matchSuggestion.reason,
     })
     .select("id, sla_deadline")
     .single();

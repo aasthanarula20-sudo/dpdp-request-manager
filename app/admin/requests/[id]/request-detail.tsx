@@ -17,12 +17,21 @@ interface Contact {
   is_anonymized: boolean;
 }
 
+interface SuggestedContact {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+}
+
 export default function RequestDetail({
   request,
   contact,
+  suggestedContact,
 }: {
   request: DataRequestRow;
   contact: Contact | null;
+  suggestedContact: SuggestedContact | null;
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState(request.draft_response ?? "");
@@ -30,6 +39,28 @@ export default function RequestDetail({
   const [message, setMessage] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectBox, setShowRejectBox] = useState(false);
+  const [details, setDetails] = useState(request.details);
+  const [piiEntities, setPiiEntities] = useState(request.detected_pii?.entities ?? []);
+  const [redactingText, setRedactingText] = useState<string | null>(null);
+
+  async function handleRedact(text: string) {
+    setRedactingText(text);
+    try {
+      const res = await fetch(`/api/requests/${request.id}/redact-pii`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Redaction failed");
+      setDetails(body.details);
+      setPiiEntities((prev) => prev.filter((e) => e.text !== text));
+    } catch (err) {
+      setMessage(`Error: ${(err as Error).message}`);
+    } finally {
+      setRedactingText(null);
+    }
+  }
 
   const isFinal = request.status === "resolved" || request.status === "rejected";
 
@@ -58,6 +89,30 @@ export default function RequestDetail({
     } finally {
       setBusy(false);
       setShowRejectBox(false);
+    }
+  }
+
+  const [matchConfirmed, setMatchConfirmed] = useState(false);
+  const [matchBusy, setMatchBusy] = useState(false);
+
+  async function handleConfirmMatch() {
+    setMatchBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/requests/${request.id}/confirm-match`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Failed to confirm match");
+      setMatchConfirmed(true);
+      setMessage(
+        body.otpRequired
+          ? "Match confirmed — a new verification code was sent to the confirmed contact."
+          : "Match confirmed."
+      );
+      router.refresh();
+    } catch (err) {
+      setMessage(`Error: ${(err as Error).message}`);
+    } finally {
+      setMatchBusy(false);
     }
   }
 
@@ -104,11 +159,11 @@ export default function RequestDetail({
             <Item label="Severity" value={request.severity ?? "—"} />
           </dl>
 
-          {request.details && (
+          {details && (
             <div className="mb-4">
               <p className="text-sm font-medium text-slate-700 mb-1">Details</p>
               <p className="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 rounded-md p-3">
-                {request.details}
+                {details}
               </p>
             </div>
           )}
@@ -118,14 +173,28 @@ export default function RequestDetail({
             {request.detected_pii ? (
               <div className="text-sm text-slate-600 bg-slate-50 rounded-md p-3">
                 <p className="mb-1">{request.detected_pii.summary}</p>
-                {request.detected_pii.entities.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {request.detected_pii.entities.map((e) => (
-                      <span key={e} className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
-                        {e}
+                {piiEntities.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {piiEntities.map((e) => (
+                      <span
+                        key={e.text}
+                        className="flex items-center gap-1.5 text-xs bg-slate-200 text-slate-700 pl-2 pr-1 py-0.5 rounded-full"
+                        title={e.text}
+                      >
+                        {e.type}
+                        <button
+                          type="button"
+                          disabled={redactingText === e.text}
+                          onClick={() => handleRedact(e.text)}
+                          className="rounded-full bg-slate-300 hover:bg-red-200 hover:text-red-800 px-1.5 py-0.5 text-[10px] font-medium disabled:opacity-40"
+                        >
+                          {redactingText === e.text ? "…" : "Erase"}
+                        </button>
                       </span>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-xs text-slate-400 mt-1">No flagged mentions remaining.</p>
                 )}
               </div>
             ) : (
@@ -147,6 +216,27 @@ export default function RequestDetail({
             </dl>
           ) : (
             <p className="text-sm text-slate-400">No match found in CRM.</p>
+          )}
+
+          {suggestedContact && !matchConfirmed && (
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-md p-3">
+              <p className="text-sm font-medium text-amber-900 mb-1">
+                Possible match (AI-suggested, unconfirmed)
+              </p>
+              <p className="text-sm text-amber-800 mb-2">
+                {suggestedContact.full_name} ({suggestedContact.email}
+                {suggestedContact.phone ? `, ${suggestedContact.phone}` : ""})
+                {request.suggested_match_reason ? ` — ${request.suggested_match_reason}` : ""}
+              </p>
+              <button
+                type="button"
+                disabled={matchBusy}
+                onClick={handleConfirmMatch}
+                className="rounded-md bg-amber-600 text-white px-3 py-1.5 text-xs font-medium hover:bg-amber-700 disabled:opacity-40"
+              >
+                {matchBusy ? "Confirming…" : "Confirm this is the same person"}
+              </button>
+            </div>
           )}
         </div>
 

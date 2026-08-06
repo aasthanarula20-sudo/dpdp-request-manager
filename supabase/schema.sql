@@ -27,7 +27,8 @@ create type request_status as enum (
 create type legal_basis as enum ('consent', 'legal_obligation', 'contract');
 create type action_type as enum (
   'compile_export', 'update_fields', 'hard_delete', 'anonymize_fields',
-  'update_consent_flag', 'create_escalation_ticket', 'store_nomination', 'reject_with_reason'
+  'update_consent_flag', 'create_escalation_ticket', 'store_nomination', 'reject_with_reason',
+  'redact_pii'
 );
 create type nomination_status as enum ('active', 'activated', 'revoked');
 create type severity_level as enum ('low', 'medium', 'high');
@@ -75,7 +76,9 @@ create table data_requests (
   identity_verified_at timestamptz,
   otp_hash text,
   otp_expires_at timestamptz,
-  otp_attempts integer not null default 0
+  otp_attempts integer not null default 0,
+  suggested_contact_id uuid references crm_contacts(id) on delete set null,
+  suggested_match_reason text
 );
 create index idx_data_requests_status on data_requests (status);
 create index idx_data_requests_matched_contact on data_requests (matched_contact_id);

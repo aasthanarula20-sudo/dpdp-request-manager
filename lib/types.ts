@@ -56,10 +56,12 @@ export interface DataRequestRow {
   submitted_at: string;
   sla_deadline: string;
   resolved_at: string | null;
-  detected_pii: { entities: string[]; summary: string } | null;
+  detected_pii: { entities: { type: string; text: string }[]; summary: string } | null;
   category: string | null;
   severity: SeverityLevel | null;
   draft_response: string | null;
   requested_field_changes: Record<string, unknown> | null;
   identity_verified_at: string | null;
+  suggested_contact_id: string | null;
+  suggested_match_reason: string | null;
 }
