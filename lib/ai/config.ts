@@ -20,18 +20,7 @@ interface CallOpenRouterParams {
   userPrompt: string;
 }
 
-/**
- * Shared OpenRouter chat-completion wrapper. Every AI module in this app
- * calls through this function so error handling and JSON-fence stripping
- * stay in one place. Throws on any failure (missing key, network error,
- * bad response, invalid JSON) — callers must catch and apply their own
- * fail-toward-caution fallback. Never call this from client code.
- */
-export async function callOpenRouter<T>({
-  model,
-  systemPrompt,
-  userPrompt,
-}: CallOpenRouterParams): Promise<T> {
+async function callOnce<T>({ model, systemPrompt, userPrompt }: CallOpenRouterParams): Promise<T> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is not set");
@@ -60,8 +49,30 @@ export async function callOpenRouter<T>({
   const json = await response.json();
   const content = json?.choices?.[0]?.message?.content;
   if (typeof content !== "string" || content.length === 0) {
+    // Covers both a genuinely empty response and OpenRouter's occasional
+    // quirk of returning an error object with HTTP 200 (e.g. free-tier
+    // "at capacity" errors) — either way there's no content to parse.
     throw new Error("OpenRouter response missing message content");
   }
 
   return stripFencesAndParse<T>(content);
+}
+
+/**
+ * Shared OpenRouter chat-completion wrapper. Every AI module in this app
+ * calls through this function so error handling and JSON-fence stripping
+ * stay in one place. Throws on any failure (missing key, network error,
+ * bad response, invalid JSON) — callers must catch and apply their own
+ * fail-toward-caution fallback. Never call this from client code.
+ *
+ * Retries once after a short delay: free-tier models occasionally return
+ * transient "at capacity" errors that clear up on an immediate retry.
+ */
+export async function callOpenRouter<T>(params: CallOpenRouterParams): Promise<T> {
+  try {
+    return await callOnce<T>(params);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return callOnce<T>(params);
+  }
 }
