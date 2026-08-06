@@ -57,7 +57,7 @@ create table data_requests (
   requester_email text not null,
   requester_phone text,
   details text,
-  matched_contact_id uuid references crm_contacts(id),
+  matched_contact_id uuid references crm_contacts(id) on delete set null,
   status request_status not null default 'received',
   submitted_via submission_channel not null default 'self_service',
   submitted_at timestamptz not null default now(),
@@ -96,7 +96,7 @@ execute function set_sla_deadline();
 
 create table anonymization_log (
   id uuid primary key default gen_random_uuid(),
-  contact_id uuid references crm_contacts(id),
+  contact_id uuid references crm_contacts(id) on delete set null,
   request_id uuid references data_requests(id),
   action_type action_type not null,
   fields_affected jsonb,
@@ -110,7 +110,7 @@ create index idx_anonymization_log_request on anonymization_log (request_id);
 
 create table nominations (
   id uuid primary key default gen_random_uuid(),
-  contact_id uuid references crm_contacts(id) not null,
+  contact_id uuid references crm_contacts(id) on delete cascade not null,
   request_id uuid references data_requests(id),
   nominee_name text not null,
   nominee_contact_info text not null,

@@ -208,11 +208,23 @@ export async function applyAction(params: ApplyActionParams): Promise<ApplyActio
   // anonymization_log is append-only at the application layer — every call
   // inserts a fresh row, never updates one (e.g. QA results below get their
   // own row rather than being patched onto this one).
+  //
+  // hard_delete already removed the crm_contacts row above, so contact_id
+  // can't be set here — the FK requires the referenced row to exist at
+  // insert time (ON DELETE SET NULL only governs rows that already existed
+  // when the delete happened, not new inserts). The deleted id is kept in
+  // fields_affected instead, so the audit trail doesn't lose it.
+  const logContactId = action === "hard_delete" ? null : contactId;
+  const logFieldsAffected =
+    action === "hard_delete"
+      ? { ...(loggedFieldsAffected ?? {}), deletedContactId: contactId }
+      : loggedFieldsAffected ?? (reason ? { reason } : null);
+
   const { error: logError } = await supabase.from("anonymization_log").insert({
-    contact_id: contactId,
+    contact_id: logContactId,
     request_id: requestId,
     action_type: action,
-    fields_affected: loggedFieldsAffected ?? (reason ? { reason } : null),
+    fields_affected: logFieldsAffected,
     performed_by: performedBy,
   });
   if (logError) throw logError;

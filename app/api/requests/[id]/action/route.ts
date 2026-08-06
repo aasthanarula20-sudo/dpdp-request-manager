@@ -135,10 +135,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     }
 
     const qa = await runAnonymizationQa(snapshot);
+    // hard_delete already removed the crm_contacts row, so contact_id can't
+    // be set here — same FK constraint as in applyAction's own log insert.
     await supabase.from("anonymization_log").insert({
-      contact_id: request.matched_contact_id,
+      contact_id: resolved.action === "hard_delete" ? null : request.matched_contact_id,
       request_id: id,
       action_type: resolved.action,
+      fields_affected: resolved.action === "hard_delete" ? { deletedContactId: request.matched_contact_id } : null,
       performed_by: `${performedBy} (QA)`,
       qa_status: qa.qaStatus,
       residual_pii_found: qa.residualPiiFound,
