@@ -19,6 +19,14 @@ This is advisory input for a human reviewer — never authoritative.`;
  * fixed medium-severity fallback rather than crashing or under-classifying.
  */
 export async function triageGrievance(details: string | null | undefined): Promise<GrievanceTriage> {
+  if (!details || details.trim().length === 0) {
+    // Nothing to classify — asking the model to triage an empty complaint
+    // just produces an arbitrary guess (observed: "other"/"low", not our
+    // documented "other"/"medium" fallback), for no benefit over the fixed
+    // default.
+    return FALLBACK;
+  }
+
   try {
     const model = process.env.OPENROUTER_MODEL_TRIAGE;
     if (!model) throw new Error("OPENROUTER_MODEL_TRIAGE is not set");
@@ -26,7 +34,7 @@ export async function triageGrievance(details: string | null | undefined): Promi
     const result = await callOpenRouter<GrievanceTriage>({
       model,
       systemPrompt: SYSTEM_PROMPT,
-      userPrompt: details && details.trim().length > 0 ? details : "(no details provided)",
+      userPrompt: details,
     });
 
     const validSeverities = ["low", "medium", "high"];
