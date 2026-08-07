@@ -24,14 +24,23 @@ interface SuggestedContact {
   phone: string | null;
 }
 
+interface QaLog {
+  action_type: string;
+  qa_status: "clean" | "flagged" | null;
+  residual_pii_found: string[] | null;
+  performed_at: string;
+}
+
 export default function RequestDetail({
   request,
   contact,
   suggestedContact,
+  qaLogs,
 }: {
   request: DataRequestRow;
   contact: Contact | null;
   suggestedContact: SuggestedContact | null;
+  qaLogs: QaLog[];
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState(request.draft_response ?? "");
@@ -239,6 +248,45 @@ export default function RequestDetail({
             </div>
           )}
         </div>
+
+        {qaLogs.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-sm font-medium text-slate-700 mb-2">Anonymization QA (advisory)</h2>
+            <div className="grid gap-2">
+              {qaLogs.map((log, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between text-sm rounded-md p-3 ${
+                    log.qa_status === "clean" ? "bg-emerald-50" : "bg-red-50"
+                  }`}
+                >
+                  <div>
+                    <span className="capitalize font-medium text-slate-900">
+                      {log.action_type.replace("_", " ")}
+                    </span>
+                    <span className="text-slate-500 ml-2">
+                      {new Date(log.performed_at).toLocaleString("en-IN")}
+                    </span>
+                    {log.residual_pii_found && log.residual_pii_found.length > 0 && (
+                      <div className="text-xs text-red-700 mt-1">
+                        Residual: {log.residual_pii_found.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      log.qa_status === "clean"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {log.qa_status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-sm font-medium text-slate-700 mb-2">Response draft (editable)</h2>

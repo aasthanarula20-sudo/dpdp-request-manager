@@ -40,5 +40,19 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     suggestedContact = data;
   }
 
-  return <RequestDetail request={request} contact={contact} suggestedContact={suggestedContact} />;
+  const { data: qaLogs } = await supabase
+    .from("anonymization_log")
+    .select("action_type, qa_status, residual_pii_found, performed_at")
+    .eq("request_id", id)
+    .not("qa_status", "is", null)
+    .order("performed_at", { ascending: false });
+
+  return (
+    <RequestDetail
+      request={request}
+      contact={contact}
+      suggestedContact={suggestedContact}
+      qaLogs={qaLogs ?? []}
+    />
+  );
 }
