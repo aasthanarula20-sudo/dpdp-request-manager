@@ -44,7 +44,10 @@ function LoginForm() {
             <Lock className="w-5 h-5 text-white" />
           </div>
         </div>
-        <h1 className="text-lg font-semibold text-slate-900 text-center mb-6">Admin sign in</h1>
+        <h1 className="text-lg font-semibold text-slate-900 text-center mb-2">Admin sign in</h1>
+        <p className="text-xs text-slate-500 text-center mb-6">
+          Note: this is a portfolio/demo project. DM me on LinkedIn for the admin password.
+        </p>
         <label className="block mb-4">
           <span className="block text-sm font-medium text-slate-700 mb-1">Password</span>
           <input

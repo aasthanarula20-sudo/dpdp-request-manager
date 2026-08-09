@@ -103,27 +103,15 @@ export async function verifyOtp(requestId: string, code: string): Promise<Verify
     return { ok: false, reason: "not_pending" };
   }
 
-  // Testing-only escape hatch for when email delivery isn't reachable — off
-  // unless OTP_TEST_BYPASS_CODE is explicitly set. This has no environment
-  // check (Vercel's own deployments run as "production"), so the env var
-  // itself is the only gate: it MUST be removed before any real user can
-  // reach this deployment, or anyone who knows the code can skip identity
-  // verification on any pending request.
-  const bypassCode = process.env.OTP_TEST_BYPASS_CODE;
-  const isBypass = !!bypassCode && code.trim() === bypassCode;
-  if (isBypass) {
-    console.warn(`[OTP] TEST BYPASS used for request ${requestId} — do not enable this in a real deployment`);
-  }
-
-  if (!isBypass && request.otp_attempts >= MAX_ATTEMPTS) {
+  if (request.otp_attempts >= MAX_ATTEMPTS) {
     return { ok: false, reason: "locked" };
   }
-  if (!isBypass && (!request.otp_expires_at || new Date(request.otp_expires_at) < new Date())) {
+  if (!request.otp_expires_at || new Date(request.otp_expires_at) < new Date()) {
     return { ok: false, reason: "expired" };
   }
 
   const providedHash = hashOtp(code.trim());
-  if (!isBypass && providedHash !== request.otp_hash) {
+  if (providedHash !== request.otp_hash) {
     const attempts = request.otp_attempts + 1;
     await supabase.from("data_requests").update({ otp_attempts: attempts }).eq("id", requestId);
     return {
