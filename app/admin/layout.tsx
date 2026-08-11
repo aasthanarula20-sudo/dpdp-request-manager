@@ -13,6 +13,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Link href="/admin/quick-entry" className="text-slate-600 hover:text-slate-900">
               Quick entry
             </Link>
+            <Link href="/admin/payment-ambiguity" className="text-slate-600 hover:text-slate-900">
+              Payment ambiguity
+            </Link>
           </nav>
         </div>
       </header>
