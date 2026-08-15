@@ -15,20 +15,21 @@ export interface DebitSignals {
 
 export type DebitStatus = "confirmed_debited" | "confirmed_not_debited" | "unknown";
 
-export type TrustTier = "new" | "returning" | "high_trust";
+/** Was the digital content/service already delivered to the customer when ambiguity was detected? */
+export type DeliveryStatus = "not_delivered" | "delivered";
 export type PaymentMethod = "upi" | "wallet" | "card" | "netbanking";
 export type Industry = "travel" | "food_delivery" | "retail" | "digital_goods";
 
 export interface Transaction {
   orderValue: number;
-  customerTrust: TrustTier;
+  deliveryStatus: DeliveryStatus;
   paymentMethod: PaymentMethod;
   industry: Industry;
 }
 
 export interface RiskBreakdown {
   orderValueRisk: number;
-  trustRisk: number;
+  deliveryStatusRisk: number;
   paymentMethodRisk: number;
   industryUrgencyRisk: number;
   score: number;

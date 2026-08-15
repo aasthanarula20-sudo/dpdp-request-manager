@@ -2,6 +2,7 @@
 -- Standalone add-on to the DPDP schema; run this after schema.sql (or on
 -- its own — it does not reference any DPDP tables).
 -- Safe to re-run on a project where an earlier attempt partially failed.
+-- NOTE: re-running this drops and recreates the table, wiping any existing rows.
 
 drop table if exists payment_ambiguity_transactions cascade;
 drop type if exists pa_action;
@@ -9,11 +10,11 @@ drop type if exists pa_debit_status;
 drop type if exists pa_ladder_stage;
 drop type if exists pa_industry;
 drop type if exists pa_payment_method;
-drop type if exists pa_trust_tier;
+drop type if exists pa_delivery_status;
 drop type if exists pa_signal_status;
 
 create type pa_signal_status as enum ('debited', 'not_debited', 'pending', 'not_reported');
-create type pa_trust_tier as enum ('new', 'returning', 'high_trust');
+create type pa_delivery_status as enum ('not_delivered', 'delivered');
 create type pa_payment_method as enum ('upi', 'wallet', 'card', 'netbanking');
 create type pa_industry as enum ('travel', 'food_delivery', 'retail', 'digital_goods');
 create type pa_ladder_stage as enum ('continue_polling', 'proceed', 'forced_resolution');
@@ -29,7 +30,7 @@ create table payment_ambiguity_transactions (
 
   -- Transaction profile (Stage 3 inputs)
   order_value numeric not null,
-  customer_trust pa_trust_tier not null,
+  delivery_status pa_delivery_status not null default 'not_delivered',
   payment_method pa_payment_method not null,
   industry pa_industry not null,
 

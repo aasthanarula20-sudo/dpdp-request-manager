@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { DebitSignals, Industry, PaymentMethod, TrustTier } from "@/lib/payment-ambiguity/types";
+import type { DebitSignals, DeliveryStatus, Industry, PaymentMethod } from "@/lib/payment-ambiguity/types";
 
-const TRUST_TIERS: TrustTier[] = ["new", "returning", "high_trust"];
+const DELIVERY_STATUSES: DeliveryStatus[] = ["not_delivered", "delivered"];
 const PAYMENT_METHODS: PaymentMethod[] = ["upi", "wallet", "card", "netbanking"];
 const INDUSTRIES: Industry[] = ["travel", "food_delivery", "retail", "digital_goods"];
 const SIGNAL_STATUSES: DebitSignals["bankStatusApi"][] = ["not_reported", "debited", "not_debited", "pending"];
@@ -12,7 +12,7 @@ const SIGNAL_STATUSES: DebitSignals["bankStatusApi"][] = ["not_reported", "debit
 export default function NewTransactionPage() {
   const router = useRouter();
   const [orderValue, setOrderValue] = useState("500");
-  const [customerTrust, setCustomerTrust] = useState<TrustTier>("new");
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>("not_delivered");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [industry, setIndustry] = useState<Industry>("retail");
   const [bankStatusApi, setBankStatusApi] = useState<DebitSignals["bankStatusApi"]>("not_reported");
@@ -30,7 +30,7 @@ export default function NewTransactionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderValue: Number(orderValue),
-          customerTrust,
+          deliveryStatus,
           paymentMethod,
           industry,
           signals: { bankStatusApi },
@@ -72,13 +72,13 @@ export default function NewTransactionPage() {
             />
           </Field>
 
-          <Field label="Customer trust">
+          <Field label="Delivery status">
             <select
-              value={customerTrust}
-              onChange={(e) => setCustomerTrust(e.target.value as TrustTier)}
+              value={deliveryStatus}
+              onChange={(e) => setDeliveryStatus(e.target.value as DeliveryStatus)}
               className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
             >
-              {TRUST_TIERS.map((v) => (
+              {DELIVERY_STATUSES.map((v) => (
                 <option key={v} value={v}>
                   {v}
                 </option>

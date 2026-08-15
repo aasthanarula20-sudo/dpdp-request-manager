@@ -1,6 +1,6 @@
 import { getServiceClient } from "@/lib/supabase/server";
 import { decide } from "./resolver";
-import type { DebitSignals, Decision, Industry, PaymentMethod, Transaction, TrustTier } from "./types";
+import type { DebitSignals, Decision, DeliveryStatus, Industry, PaymentMethod, Transaction } from "./types";
 
 export interface TransactionRecord {
   id: string;
@@ -15,7 +15,7 @@ export interface TransactionRecord {
 interface Row {
   id: string;
   order_value: number;
-  customer_trust: TrustTier;
+  delivery_status: DeliveryStatus;
   payment_method: PaymentMethod;
   industry: Industry;
   settlement_file: DebitSignals["settlementFile"];
@@ -38,7 +38,7 @@ function rowToRecord(row: Row): TransactionRecord {
     id: row.id,
     transaction: {
       orderValue: row.order_value,
-      customerTrust: row.customer_trust,
+      deliveryStatus: row.delivery_status,
       paymentMethod: row.payment_method,
       industry: row.industry,
     },
@@ -91,7 +91,7 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
     .from("payment_ambiguity_transactions")
     .insert({
       order_value: input.transaction.orderValue,
-      customer_trust: input.transaction.customerTrust,
+      delivery_status: input.transaction.deliveryStatus,
       payment_method: input.transaction.paymentMethod,
       industry: input.transaction.industry,
       settlement_file: signals.settlementFile,
@@ -143,7 +143,7 @@ export async function evaluateTransaction(
   };
   const transaction: Transaction = {
     orderValue: row.order_value,
-    customerTrust: row.customer_trust,
+    deliveryStatus: row.delivery_status,
     paymentMethod: row.payment_method,
     industry: row.industry,
   };

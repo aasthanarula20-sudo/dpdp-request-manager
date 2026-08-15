@@ -109,7 +109,7 @@ export default function PaymentAmbiguityTable({ transactions }: { transactions: 
                     ₹{t.transaction.orderValue.toLocaleString("en-IN")} · {t.transaction.paymentMethod}
                   </div>
                   <div className="text-xs text-slate-400">
-                    {t.transaction.customerTrust} · {t.transaction.industry}
+                    {t.transaction.deliveryStatus} · {t.transaction.industry}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-600">

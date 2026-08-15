@@ -68,16 +68,16 @@ assertEqual("no signals at all", arbitrateDebitStatus(noSignals), "unknown");
 
 // --- Stage 3: scoring extremes ---
 {
-  const allLowest: Transaction = { orderValue: 500, customerTrust: "high_trust", paymentMethod: "upi", industry: "digital_goods" };
+  const allLowest: Transaction = { orderValue: 500, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "digital_goods" };
   const breakdown = computeRiskScore(allLowest);
-  // 0.30*0.1 + 0.35*0.1 + 0.15*0.2 + 0.20*0.2 = 0.03+0.035+0.03+0.04
-  assertEqual("lowest-risk combination", breakdown.score, 0.135);
+  // 0.35*0.1 + 0.25*0.2 + 0.15*0.2 + 0.25*0.2 = 0.035+0.05+0.03+0.05
+  assertEqual("lowest-risk combination", breakdown.score, 0.165);
 }
 {
-  const allHighest: Transaction = { orderValue: 50000, customerTrust: "new", paymentMethod: "netbanking", industry: "travel" };
+  const allHighest: Transaction = { orderValue: 50000, deliveryStatus: "delivered", paymentMethod: "netbanking", industry: "travel" };
   const breakdown = computeRiskScore(allHighest);
-  // 0.30*0.9 + 0.35*0.8 + 0.15*0.7 + 0.20*0.8 = 0.27+0.28+0.105+0.16
-  assertEqual("highest-risk combination", breakdown.score, 0.815);
+  // 0.35*0.9 + 0.25*0.8 + 0.15*0.7 + 0.25*0.8 = 0.315+0.2+0.105+0.2
+  assertEqual("highest-risk combination", breakdown.score, 0.82);
 }
 
 // --- Stage 4: threshold boundaries + debit_status irrelevance above 0.30 ---
@@ -85,8 +85,8 @@ assertEqual("borderline margin constant", RISK_THRESHOLDS.borderlineMargin, 0.03
 
 {
   // order_value_risk band edge: 999 vs 1000
-  const under: Transaction = { orderValue: 999, customerTrust: "high_trust", paymentMethod: "upi", industry: "digital_goods" };
-  const at: Transaction = { orderValue: 1000, customerTrust: "high_trust", paymentMethod: "upi", industry: "digital_goods" };
+  const under: Transaction = { orderValue: 999, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "digital_goods" };
+  const at: Transaction = { orderValue: 1000, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "digital_goods" };
   const underScore = computeRiskScore(under).score;
   const atScore = computeRiskScore(at).score;
   assertEqual("order value band jumps at 1000", underScore < atScore, true);
@@ -94,7 +94,7 @@ assertEqual("borderline margin constant", RISK_THRESHOLDS.borderlineMargin, 0.03
 
 {
   // Above the 0.30 band, debit_status must not change the action.
-  const tx: Transaction = { orderValue: 8000, customerTrust: "returning", paymentMethod: "upi", industry: "travel" }; // score 0.475
+  const tx: Transaction = { orderValue: 8000, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "food_delivery" }; // score 0.465
   const debited = decide(tx, { ...noSignals, bankStatusApi: "debited" }, 6);
   const notDebited = decide(tx, { ...noSignals, bankStatusApi: "not_debited" }, 6);
   const unknown = decide(tx, noSignals, 6);

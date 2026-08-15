@@ -1,16 +1,23 @@
-import type { Industry, PaymentMethod, RiskBreakdown, Transaction, TrustTier } from "./types";
+import type { DeliveryStatus, Industry, PaymentMethod, RiskBreakdown, Transaction } from "./types";
 
+/**
+ * Every dimension here answers "how costly or urgent is it to get this
+ * decision wrong while we're still uncertain" — deliberately excludes any
+ * judgment of the customer (no fraud/trust proxy). Weights were
+ * proportionally redistributed after removing a former customer-trust
+ * dimension.
+ */
 const WEIGHTS = {
-  orderValue: 0.3,
-  trust: 0.35,
+  orderValue: 0.35,
+  deliveryStatus: 0.25,
   paymentMethod: 0.15,
-  industryUrgency: 0.2,
+  industryUrgency: 0.25,
 };
 
-const TRUST_RISK: Record<TrustTier, number> = {
-  new: 0.8,
-  returning: 0.3,
-  high_trust: 0.1,
+/** Already-delivered digital content/services are much harder to claw back than an unshipped order. */
+const DELIVERY_STATUS_RISK: Record<DeliveryStatus, number> = {
+  not_delivered: 0.2,
+  delivered: 0.8,
 };
 
 const PAYMENT_METHOD_RISK: Record<PaymentMethod, number> = {
@@ -36,28 +43,27 @@ function orderValueRisk(orderValue: number): number {
 
 /**
  * Stage 3 — Risk Scoring.
- * risk_score = 0.30 * order_value_risk + 0.35 * trust_risk
- *            + 0.15 * payment_method_risk + 0.20 * industry_urgency_risk
+ * risk_score = 0.35 * order_value_risk + 0.25 * delivery_status_risk
+ *            + 0.15 * payment_method_risk + 0.25 * industry_urgency_risk
  */
 export function computeRiskScore(transaction: Transaction): RiskBreakdown {
   const orderValueComponent = orderValueRisk(transaction.orderValue);
-  const trustComponent = TRUST_RISK[transaction.customerTrust];
+  const deliveryStatusComponent = DELIVERY_STATUS_RISK[transaction.deliveryStatus];
   const paymentMethodComponent = PAYMENT_METHOD_RISK[transaction.paymentMethod];
   const industryUrgencyComponent = INDUSTRY_URGENCY_RISK[transaction.industry];
 
   const score =
     WEIGHTS.orderValue * orderValueComponent +
-    WEIGHTS.trust * trustComponent +
+    WEIGHTS.deliveryStatus * deliveryStatusComponent +
     WEIGHTS.paymentMethod * paymentMethodComponent +
     WEIGHTS.industryUrgency * industryUrgencyComponent;
 
   return {
     orderValueRisk: orderValueComponent,
-    trustRisk: trustComponent,
+    deliveryStatusRisk: deliveryStatusComponent,
     paymentMethodRisk: paymentMethodComponent,
     industryUrgencyRisk: industryUrgencyComponent,
-    // Guard against binary floating-point noise (e.g. 0.30000000000000004)
-    // so scores match the walkthrough's numbers exactly.
+    // Guard against binary floating-point noise (e.g. 0.30000000000000004).
     score: Math.round(score * 1e6) / 1e6,
   };
 }
