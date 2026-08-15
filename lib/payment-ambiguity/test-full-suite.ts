@@ -27,14 +27,23 @@ const noSignals: DebitSignals = {
   clientAppState: "not_reported",
 };
 
-// S1 — Fast path
+// S1 — Fast path, genuinely no signal yet
+{
+  const tx: Transaction = { orderValue: 200, customerTrust: "high_trust", paymentMethod: "upi", industry: "retail" };
+  const result = decide(tx, noSignals, 2);
+  assertEqual("S1 action", result.action, "continue_polling");
+  assertEqual("S1 ladderStage", result.ladderStage, "continue_polling");
+  assertEqual("S1 debitStatus", result.debitStatus, null);
+}
+
+// S1b — Fast-path window, but a confirmed signal already arrived: act immediately
 {
   const tx: Transaction = { orderValue: 200, customerTrust: "high_trust", paymentMethod: "upi", industry: "retail" };
   const signals: DebitSignals = { ...noSignals, bankStatusApi: "debited" };
   const result = decide(tx, signals, 2);
-  assertEqual("S1 action", result.action, "continue_polling");
-  assertEqual("S1 ladderStage", result.ladderStage, "continue_polling");
-  assertEqual("S1 debitStatus", result.debitStatus, null);
+  assertEqual("S1b action", result.action, "refund_confirmed_debit");
+  assertEqual("S1b ladderStage", result.ladderStage, "proceed");
+  assertEqual("S1b debitStatus", result.debitStatus, "confirmed_debited");
 }
 
 // S2 — Past fast-path, debit confirmed

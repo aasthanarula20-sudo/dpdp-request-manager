@@ -57,7 +57,15 @@ export function decide(
   signals: DebitSignals,
   elapsedMinutes: number
 ): Decision {
-  const ladderStage = evaluateLadder(elapsedMinutes);
+  const debitStatus = arbitrateDebitStatus(signals);
+  const timeBasedStage = evaluateLadder(elapsedMinutes);
+
+  // A confirmed debit status from a medium-or-higher trust source is stable —
+  // it isn't going to revert itself a few minutes later, so waiting out the
+  // fast-path window adds no information. Only genuinely unresolved
+  // (`unknown`) cases need that buffer for the picture to settle.
+  const ladderStage =
+    debitStatus !== "unknown" && timeBasedStage === "continue_polling" ? "proceed" : timeBasedStage;
 
   if (ladderStage === "continue_polling") {
     return {
@@ -70,7 +78,6 @@ export function decide(
     };
   }
 
-  const debitStatus = arbitrateDebitStatus(signals);
   const riskBreakdown = computeRiskScore(transaction);
   const action = mapScoreToAction(riskBreakdown.score, debitStatus);
 
