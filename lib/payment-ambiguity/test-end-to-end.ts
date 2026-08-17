@@ -7,10 +7,11 @@
  * Usage: npx tsx lib/payment-ambiguity/test-end-to-end.ts
  */
 import { arbitrateDebitStatus } from "./arbitration";
+import { arbitrateIntent } from "./customer-intent";
 import { evaluateLadder, RISK_THRESHOLDS } from "./resolver";
 import { decide } from "./resolver";
 import { computeRiskScore } from "./scoring";
-import type { DebitSignals, Transaction } from "./types";
+import type { CustomerIntentSignals, DebitSignals, Transaction } from "./types";
 
 let passed = 0;
 let failed = 0;
@@ -30,6 +31,11 @@ const noSignals: DebitSignals = {
   bankStatusApi: "not_reported",
   gatewayWebhook: "not_reported",
   clientAppState: "not_reported",
+};
+
+const noIntentSignals: CustomerIntentSignals = {
+  explicitCancelAction: "not_reported",
+  passiveAbandonSignal: "not_reported",
 };
 
 // --- Stage 1: ladder boundaries ---
@@ -66,6 +72,15 @@ assertEqual(
 );
 assertEqual("no signals at all", arbitrateDebitStatus(noSignals), "unknown");
 
+// --- Stage 2b: customer intent arbitration ---
+assertEqual("explicit cancel confirms intent", arbitrateIntent({ ...noIntentSignals, explicitCancelAction: "reported" }), "confirmed_cancel");
+assertEqual(
+  "passive abandon signal alone does not confirm intent",
+  arbitrateIntent({ ...noIntentSignals, passiveAbandonSignal: "reported" }),
+  "no_cancel_signal"
+);
+assertEqual("no intent signals at all", arbitrateIntent(noIntentSignals), "no_cancel_signal");
+
 // --- Stage 3: scoring extremes ---
 {
   const allLowest: Transaction = { orderValue: 500, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "digital_goods" };
@@ -101,6 +116,24 @@ assertEqual("borderline margin constant", RISK_THRESHOLDS.borderlineMargin, 0.03
   assertEqual("debit_status irrelevant above 0.30 (debited)", debited.action, "provisional_access_stepup_required");
   assertEqual("debit_status irrelevant above 0.30 (not_debited)", notDebited.action, "provisional_access_stepup_required");
   assertEqual("debit_status irrelevant above 0.30 (unknown)", unknown.action, "provisional_access_stepup_required");
+}
+
+{
+  // Above the 0.30 band, a confirmed cancellation must not change the action either —
+  // intent only matters within the same low-risk band where debit_status does.
+  const tx: Transaction = { orderValue: 8000, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "food_delivery" }; // score 0.465
+  const cancelled = decide(tx, { ...noSignals, bankStatusApi: "debited" }, 6, { ...noIntentSignals, explicitCancelAction: "reported" });
+  assertEqual("intent irrelevant above 0.30", cancelled.action, "provisional_access_stepup_required");
+}
+
+{
+  // Reasoning trace: sanity-check it mentions the actual action and score, not a generic placeholder.
+  const tx: Transaction = { orderValue: 200, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "retail" };
+  const result = decide(tx, { ...noSignals, bankStatusApi: "debited" }, 6);
+  assertEqual("reasoning mentions the action", result.reasoning.includes("proceed_order_confirmed"), true);
+  assertEqual("reasoning mentions the score", result.reasoning.includes("0.215"), true);
+  const polling = decide(tx, noSignals, 2);
+  assertEqual("polling reasoning mentions fast-path window", polling.reasoning.includes("fast-path window"), true);
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

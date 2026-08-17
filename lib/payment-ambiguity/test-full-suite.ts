@@ -6,7 +6,7 @@
  * Usage: npx tsx lib/payment-ambiguity/test-full-suite.ts
  */
 import { decide } from "./resolver";
-import type { DebitSignals, Transaction } from "./types";
+import type { CustomerIntentSignals, DebitSignals, Transaction } from "./types";
 
 let passed = 0;
 let failed = 0;
@@ -28,6 +28,11 @@ const noSignals: DebitSignals = {
   clientAppState: "not_reported",
 };
 
+const noIntentSignals: CustomerIntentSignals = {
+  explicitCancelAction: "not_reported",
+  passiveAbandonSignal: "not_reported",
+};
+
 // T1 — Fast path, genuinely no signal yet
 {
   const tx: Transaction = { orderValue: 200, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "retail" };
@@ -42,7 +47,7 @@ const noSignals: DebitSignals = {
   const tx: Transaction = { orderValue: 200, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "retail" };
   const signals: DebitSignals = { ...noSignals, bankStatusApi: "debited" };
   const result = decide(tx, signals, 2);
-  assertEqual("T1b action", result.action, "refund_confirmed_debit");
+  assertEqual("T1b action", result.action, "proceed_order_confirmed");
   assertEqual("T1b ladderStage", result.ladderStage, "proceed");
   assertEqual("T1b debitStatus", result.debitStatus, "confirmed_debited");
   assertEqual("T1b score", result.riskScore, 0.215);
@@ -54,8 +59,26 @@ const noSignals: DebitSignals = {
   const signals: DebitSignals = { ...noSignals, bankStatusApi: "debited" };
   const result = decide(tx, signals, 6);
   assertEqual("T2 score", result.riskScore, 0.215);
-  assertEqual("T2 action", result.action, "refund_confirmed_debit");
+  assertEqual("T2 action", result.action, "proceed_order_confirmed");
   assertEqual("T2 borderline", result.borderline, false);
+}
+
+// T2b — Same as T2, but the customer explicitly cancelled: refund fires instead
+{
+  const tx: Transaction = { orderValue: 200, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "retail" };
+  const signals: DebitSignals = { ...noSignals, bankStatusApi: "debited" };
+  const intentSignals: CustomerIntentSignals = { ...noIntentSignals, explicitCancelAction: "reported" };
+  const result = decide(tx, signals, 6, intentSignals);
+  assertEqual("T2b action", result.action, "refund_confirmed_debit");
+}
+
+// T2c — A passive abandon signal alone (tab closed) does not confirm cancellation
+{
+  const tx: Transaction = { orderValue: 200, deliveryStatus: "not_delivered", paymentMethod: "upi", industry: "retail" };
+  const signals: DebitSignals = { ...noSignals, bankStatusApi: "debited" };
+  const intentSignals: CustomerIntentSignals = { ...noIntentSignals, passiveAbandonSignal: "reported" };
+  const result = decide(tx, signals, 6, intentSignals);
+  assertEqual("T2c action (weak intent signal ignored)", result.action, "proceed_order_confirmed");
 }
 
 // T3 — Same profile, confirmed NOT debited
@@ -91,7 +114,7 @@ const noSignals: DebitSignals = {
   const signals: DebitSignals = { ...noSignals, bankStatusApi: "debited" };
   const result = decide(tx, signals, 6);
   assertEqual("T5b score", result.riskScore, 0.21);
-  assertEqual("T5b action", result.action, "refund_confirmed_debit");
+  assertEqual("T5b action", result.action, "proceed_order_confirmed");
 }
 
 // T6 — Medium-high, borderline
@@ -110,7 +133,7 @@ const noSignals: DebitSignals = {
   const signals: DebitSignals = { ...noSignals, bankStatusApi: "debited" };
   const result = decide(tx, signals, 6);
   assertEqual("T7 score", result.riskScore, 0.28);
-  assertEqual("T7 action", result.action, "refund_confirmed_debit");
+  assertEqual("T7 action", result.action, "proceed_order_confirmed");
   assertEqual("T7 borderline", result.borderline, true);
 }
 

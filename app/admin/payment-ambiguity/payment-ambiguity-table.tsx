@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TransactionRecord } from "@/lib/payment-ambiguity/store";
 import type { Action } from "@/lib/payment-ambiguity/types";
 
 const ACTION_STYLES: Record<Action, string> = {
   continue_polling: "bg-slate-100 text-slate-700",
+  proceed_order_confirmed: "bg-emerald-100 text-emerald-800",
   refund_confirmed_debit: "bg-blue-100 text-blue-800",
   release_hold_no_action: "bg-slate-100 text-slate-700",
   refund_precautionary: "bg-amber-100 text-amber-800",
@@ -17,6 +18,7 @@ const ACTION_STYLES: Record<Action, string> = {
 
 const ACTION_LABELS: Record<Action, string> = {
   continue_polling: "Continue polling",
+  proceed_order_confirmed: "Order confirmed",
   refund_confirmed_debit: "Refund (confirmed debit)",
   release_hold_no_action: "Release hold",
   refund_precautionary: "Refund (precautionary)",
@@ -103,45 +105,52 @@ export default function PaymentAmbiguityTable({ transactions }: { transactions: 
           </thead>
           <tbody>
             {filtered.map((t) => (
-              <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="px-4 py-3">
-                  <div className="text-slate-900 font-medium">
-                    ₹{t.transaction.orderValue.toLocaleString("en-IN")} · {t.transaction.paymentMethod}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {t.transaction.deliveryStatus} · {t.transaction.industry}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  <ElapsedLabel ambiguityDetectedAt={t.ambiguityDetectedAt} />
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {t.decision.ladderStage}
-                  {t.decision.ladderStage === "forced_resolution" && (
-                    <span className="ml-1 text-xs text-amber-600">(forced)</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-slate-600">{t.decision.debitStatus ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-600">
-                  {t.decision.riskScore ?? "—"}
-                  {t.decision.borderline && <span className="ml-1 text-xs text-amber-600">borderline</span>}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_STYLES[t.decision.action]}`}>
-                    {ACTION_LABELS[t.decision.action]}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => handleReevaluate(t.id)}
-                    disabled={reevaluating === t.id}
-                    className="rounded-md border border-slate-300 px-3 py-1 text-slate-700 text-xs font-medium hover:bg-slate-100 disabled:opacity-50"
-                  >
-                    {reevaluating === t.id ? "Evaluating…" : "Re-evaluate"}
-                  </button>
-                </td>
-              </tr>
+              <Fragment key={t.id}>
+                <tr className="hover:bg-slate-50">
+                  <td className="px-4 py-3">
+                    <div className="text-slate-900 font-medium">
+                      ₹{t.transaction.orderValue.toLocaleString("en-IN")} · {t.transaction.paymentMethod}
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {t.transaction.deliveryStatus} · {t.transaction.industry}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <ElapsedLabel ambiguityDetectedAt={t.ambiguityDetectedAt} />
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {t.decision.ladderStage}
+                    {t.decision.ladderStage === "forced_resolution" && (
+                      <span className="ml-1 text-xs text-amber-600">(forced)</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{t.decision.debitStatus ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {t.decision.riskScore ?? "—"}
+                    {t.decision.borderline && <span className="ml-1 text-xs text-amber-600">borderline</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_STYLES[t.decision.action]}`}>
+                      {ACTION_LABELS[t.decision.action]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleReevaluate(t.id)}
+                      disabled={reevaluating === t.id}
+                      className="rounded-md border border-slate-300 px-3 py-1 text-slate-700 text-xs font-medium hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      {reevaluating === t.id ? "Evaluating…" : "Re-evaluate"}
+                    </button>
+                  </td>
+                </tr>
+                <tr className="border-b border-slate-50">
+                  <td colSpan={7} className="px-4 pb-3 -mt-2 text-xs text-slate-400 italic">
+                    {t.decision.reasoning}
+                  </td>
+                </tr>
+              </Fragment>
             ))}
             {filtered.length === 0 && (
               <tr>

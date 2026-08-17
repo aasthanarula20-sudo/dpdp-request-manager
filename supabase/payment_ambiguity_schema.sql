@@ -20,7 +20,7 @@ create type pa_industry as enum ('travel', 'food_delivery', 'retail', 'digital_g
 create type pa_ladder_stage as enum ('continue_polling', 'proceed', 'forced_resolution');
 create type pa_debit_status as enum ('confirmed_debited', 'confirmed_not_debited', 'unknown');
 create type pa_action as enum (
-  'continue_polling', 'refund_confirmed_debit', 'release_hold_no_action',
+  'continue_polling', 'proceed_order_confirmed', 'refund_confirmed_debit', 'release_hold_no_action',
   'refund_precautionary', 'provisional_access', 'provisional_access_stepup_required',
   'hold_manual_review'
 );
@@ -51,6 +51,7 @@ create table payment_ambiguity_transactions (
   risk_breakdown jsonb,
   action pa_action not null default 'continue_polling',
   borderline boolean not null default false,
+  reasoning text,
 
   created_at timestamptz not null default now()
 );

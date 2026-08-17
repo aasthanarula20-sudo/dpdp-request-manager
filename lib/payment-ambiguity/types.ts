@@ -15,6 +15,17 @@ export interface DebitSignals {
 
 export type DebitStatus = "confirmed_debited" | "confirmed_not_debited" | "unknown";
 
+export type IntentSignalStatus = "reported" | "not_reported";
+
+export interface CustomerIntentSignals {
+  /** Customer explicitly cancelled (e.g. clicked "Cancel order") — the only signal that confirms cancellation. */
+  explicitCancelAction: IntentSignalStatus;
+  /** Passive signal only (tab closed, app backgrounded) — never sufficient alone to confirm cancellation. */
+  passiveAbandonSignal: IntentSignalStatus;
+}
+
+export type CustomerIntent = "confirmed_cancel" | "no_cancel_signal";
+
 /** Was the digital content/service already delivered to the customer when ambiguity was detected? */
 export type DeliveryStatus = "not_delivered" | "delivered";
 export type PaymentMethod = "upi" | "wallet" | "card" | "netbanking";
@@ -39,6 +50,7 @@ export type LadderStage = "continue_polling" | "proceed" | "forced_resolution";
 
 export type Action =
   | "continue_polling"
+  | "proceed_order_confirmed"
   | "refund_confirmed_debit"
   | "release_hold_no_action"
   | "refund_precautionary"
@@ -53,4 +65,6 @@ export interface Decision {
   riskScore: number | null;
   riskBreakdown: RiskBreakdown | null;
   borderline: boolean;
+  /** Plain-language explanation of how this decision was reached, built from the same data above. */
+  reasoning: string;
 }

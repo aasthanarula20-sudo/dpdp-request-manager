@@ -30,6 +30,7 @@ interface Row {
   risk_breakdown: Decision["riskBreakdown"];
   action: Decision["action"];
   borderline: boolean;
+  reasoning: string;
   created_at: string;
 }
 
@@ -57,6 +58,7 @@ function rowToRecord(row: Row): TransactionRecord {
       riskScore: row.risk_score,
       riskBreakdown: row.risk_breakdown,
       borderline: row.borderline,
+      reasoning: row.reasoning,
     },
     createdAt: row.created_at,
   };
@@ -106,6 +108,7 @@ export async function createTransaction(input: CreateTransactionInput): Promise<
       risk_breakdown: decision.riskBreakdown,
       action: decision.action,
       borderline: decision.borderline,
+      reasoning: decision.reasoning,
     })
     .select()
     .single();
@@ -164,6 +167,7 @@ export async function evaluateTransaction(
       risk_breakdown: decision.riskBreakdown,
       action: decision.action,
       borderline: decision.borderline,
+      reasoning: decision.reasoning,
     })
     .eq("id", id)
     .select()
