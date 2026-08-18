@@ -57,11 +57,31 @@ function bandName(score: number): string {
 }
 
 /**
- * Stage 4 — Threshold → Action Mapping. Only the lowest band branches on
- * debit_status; above that, the caution level does the deciding regardless
- * of whether money actually moved. Within the lowest band, a confirmed
- * debit defaults to the order proceeding normally — refund is the
- * exception, triggered only when the customer's own intent was to cancel.
+ * Stage 4 — Threshold → Action Mapping.
+ *
+ * IMPORTANT — two different kinds of "trust" are at play in this module,
+ * and only one of them lives here:
+ *   - SOURCE trust (which signal to believe when they disagree) is
+ *     arbitration.ts's job. By the time `debitStatus` reaches this
+ *     function, that question is already settled — "confirmed_debited"
+ *     here means a source arbitration already trusted enough to call
+ *     definite, not a raw, unverified report.
+ *   - RISK-based caution (how much blast radius this transaction carries)
+ *     is this function's job, and it is NOT a comment on whether the
+ *     debit_status is accurate. A `hold_manual_review` outcome with
+ *     debit_status = confirmed_debited does not mean the system doubts
+ *     the bank — it means even a confirmed, accurate debit isn't enough
+ *     information on its own to safely auto-finalize a high-blast-radius
+ *     transaction (see scoring.ts for what drives blast radius: order
+ *     value and delivery status). Only the lowest risk band lets
+ *     debit_status change the actual outcome; above it, the caution
+ *     level decides regardless of whether money moved, because at that
+ *     point the open question isn't "did money move" but "how much
+ *     should we risk finalizing automatically."
+ *
+ * Within the lowest band, a confirmed debit defaults to the order
+ * proceeding normally — refund is the exception, triggered only when the
+ * customer's own intent was to cancel (see customer-intent.ts).
  */
 function mapScoreToAction(score: number, debitStatus: DebitStatus, intent: CustomerIntent): Action {
   if (score < RISK_THRESHOLDS.low) {

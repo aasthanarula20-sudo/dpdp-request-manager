@@ -11,7 +11,7 @@ const SIGNAL_STATUSES: DebitSignals["bankStatusApi"][] = ["not_reported", "debit
 
 export default function NewTransactionPage() {
   const router = useRouter();
-  const [orderValue, setOrderValue] = useState("500");
+  const [orderValue, setOrderValue] = useState("");
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>("not_delivered");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [industry, setIndustry] = useState<Industry>("retail");
@@ -67,7 +67,8 @@ export default function NewTransactionPage() {
               min={0}
               value={orderValue}
               onChange={(e) => setOrderValue(e.target.value)}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              placeholder="e.g. 500"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
               required
             />
           </Field>
@@ -76,7 +77,7 @@ export default function NewTransactionPage() {
             <select
               value={deliveryStatus}
               onChange={(e) => setDeliveryStatus(e.target.value as DeliveryStatus)}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
             >
               {DELIVERY_STATUSES.map((v) => (
                 <option key={v} value={v}>
@@ -90,7 +91,7 @@ export default function NewTransactionPage() {
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
             >
               {PAYMENT_METHODS.map((v) => (
                 <option key={v} value={v}>
@@ -104,7 +105,7 @@ export default function NewTransactionPage() {
             <select
               value={industry}
               onChange={(e) => setIndustry(e.target.value as Industry)}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
             >
               {INDUSTRIES.map((v) => (
                 <option key={v} value={v}>
@@ -118,7 +119,7 @@ export default function NewTransactionPage() {
             <select
               value={bankStatusApi}
               onChange={(e) => setBankStatusApi(e.target.value as DebitSignals["bankStatusApi"])}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
             >
               {SIGNAL_STATUSES.map((v) => (
                 <option key={v} value={v}>
@@ -134,7 +135,7 @@ export default function NewTransactionPage() {
               min={0}
               value={minutesAgo}
               onChange={(e) => setMinutesAgo(e.target.value)}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
             />
           </Field>
 
