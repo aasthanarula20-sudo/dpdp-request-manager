@@ -40,28 +40,31 @@ const ACTION_LABELS: Record<string, string> = {
 
 export default function TryIt() {
   const [orderValue, setOrderValue] = useState("");
-  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>("not_delivered");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
-  const [industry, setIndustry] = useState<Industry>("retail");
-  const [bankStatusApi, setBankStatusApi] = useState<DebitSignals["bankStatusApi"]>("not_reported");
-  const [minutesAgo, setMinutesAgo] = useState("6");
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus | "">("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
+  const [industry, setIndustry] = useState<Industry | "">("");
+  const [bankStatusApi, setBankStatusApi] = useState<DebitSignals["bankStatusApi"] | "">("");
+  const [minutesAgo, setMinutesAgo] = useState("");
+
+  const allFieldsFilled = Boolean(orderValue && deliveryStatus && paymentMethod && industry && bankStatusApi && minutesAgo);
 
   const result = useMemo(() => {
+    if (!allFieldsFilled) return null;
     const value = Number(orderValue);
-    if (!orderValue || Number.isNaN(value) || value < 0) return null;
+    if (Number.isNaN(value) || value < 0) return null;
     return decide(
-      { orderValue: value, deliveryStatus, paymentMethod, industry },
-      { ...NO_SIGNALS, bankStatusApi },
+      { orderValue: value, deliveryStatus: deliveryStatus as DeliveryStatus, paymentMethod: paymentMethod as PaymentMethod, industry: industry as Industry },
+      { ...NO_SIGNALS, bankStatusApi: bankStatusApi as DebitSignals["bankStatusApi"] },
       Number(minutesAgo) || 0
     );
-  }, [orderValue, deliveryStatus, paymentMethod, industry, bankStatusApi, minutesAgo]);
+  }, [allFieldsFilled, orderValue, deliveryStatus, paymentMethod, industry, bankStatusApi, minutesAgo]);
 
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 mb-10">
       <h2 className="text-lg font-semibold text-slate-900 mb-1">Try it yourself</h2>
       <p className="text-sm text-slate-500 mb-5">
-        Runs entirely in your browser — nothing here is saved or sent to the server. Change any value and the
-        decision updates instantly.
+        Runs entirely in your browser — nothing here is saved or sent to the server. Fill in every field and the
+        decision appears instantly.
       </p>
 
       <div className="grid sm:grid-cols-2 gap-4 mb-5">
@@ -82,6 +85,9 @@ export default function TryIt() {
             onChange={(e) => setDeliveryStatus(e.target.value as DeliveryStatus)}
             className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
           >
+            <option value="" disabled>
+              — select —
+            </option>
             {DELIVERY_STATUSES.map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -96,6 +102,9 @@ export default function TryIt() {
             onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
             className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
           >
+            <option value="" disabled>
+              — select —
+            </option>
             {PAYMENT_METHODS.map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -110,6 +119,9 @@ export default function TryIt() {
             onChange={(e) => setIndustry(e.target.value as Industry)}
             className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
           >
+            <option value="" disabled>
+              — select —
+            </option>
             {INDUSTRIES.map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -124,6 +136,9 @@ export default function TryIt() {
             onChange={(e) => setBankStatusApi(e.target.value as DebitSignals["bankStatusApi"])}
             className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
           >
+            <option value="" disabled>
+              — select —
+            </option>
             {SIGNAL_STATUSES.map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -138,12 +153,13 @@ export default function TryIt() {
             min={0}
             value={minutesAgo}
             onChange={(e) => setMinutesAgo(e.target.value)}
+            placeholder="e.g. 6"
             className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white text-slate-900"
           />
         </Field>
       </div>
 
-      {!result && <p className="text-sm text-slate-400">Enter an order value to see the decision.</p>}
+      {!result && <p className="text-sm text-slate-400">Fill in every field above to see the decision.</p>}
 
       {result && (
         <div className="border-t border-slate-100 pt-4">
