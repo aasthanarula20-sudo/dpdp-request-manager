@@ -50,12 +50,7 @@ export default async function DemoPage() {
         <h1 className="text-2xl font-semibold text-slate-900 mb-2">Payment Ambiguity Decision Layer — live demo</h1>
         <p className="text-sm text-slate-600 mb-8 max-w-2xl">
           A read-only view of the decision engine described in the{" "}
-          <a
-            href="https://claude.ai/code/artifact/6ff98108-b3e3-4c00-b0a0-2b98fa935345"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-slate-900 underline"
-          >
+          <a href="/payment-ambiguity-prd.pdf" target="_blank" rel="noopener noreferrer" className="text-slate-900 underline">
             PRD
           </a>
           . Each row below is a mocked ambiguous transaction, resolved by the same four-stage engine — escalation
