@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { listTransactions, type TransactionRecord } from "@/lib/payment-ambiguity/store";
 import type { Action } from "@/lib/payment-ambiguity/types";
+import TryIt from "./try-it";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,10 @@ export default async function DemoPage() {
           ladder, signal arbitration, risk scoring, and action mapping — with its full reasoning trace shown
           underneath.
         </p>
+
+        <TryIt />
+
+        <h2 className="text-lg font-semibold text-slate-900 mb-3">Recorded transactions</h2>
 
         {loadError && <p className="text-red-600 text-sm mb-4">Failed to load transactions: {loadError}</p>}
 
